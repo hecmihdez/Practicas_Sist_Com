@@ -98,7 +98,7 @@
  */
 int main(void)
 {
-	uint8_t Data[10] = "HOLA MUNDO";
+	uint8_t Data[10] = "HECTOR MIG";
 
 //    phy_config_t phyConfig = {0};
 //    uint32_t testTxNum     = 0;

@@ -12,6 +12,7 @@
 #include "fsl_phy.h"
 #include "board.h"
 #include "app.h"
+#include "aes.h"
 
 #include "ETH_API_cfg.h"
 #include "ETH_API.h"
@@ -91,6 +92,39 @@ static void ETH_API_s_vFillDataFrame(uint8_t* pData, uint16_t u16Size)
     }
 }
 
+uint16_t ETH_API_u16GetActualSize(uint16_t u16DataSize)
+{
+	uint16_t u16Remainder = (uint16_t)(u16DataSize % 16);
+	uint16_t u16ActSize = (uint16_t)0U;
+
+	if(u16Remainder > (uint16_t)0U)
+	{
+		u16ActSize = u16DataSize + (16 - u16Remainder);
+	}
+	else
+	{
+		u16ActSize = u16DataSize;
+	}
+
+	return u16ActSize;
+}
+
+void ETH_API_vDataPadding(uint8_t* pBufferData, uint8_t* pDataPadding, uint16_t u16ActualSize, uint16_t u16PrevSize)
+{
+	uint8_t u8IndexData = (uint8_t)0U;
+
+	for(u8IndexData = 0U; u8IndexData < u16ActualSize; u8IndexData++)
+	{
+		if(u8IndexData < u16PrevSize)
+		{
+			pDataPadding[u8IndexData] = pBufferData[u8IndexData];
+		}
+		else
+		{
+			pDataPadding[u8IndexData] = (uint8_t)(u16ActualSize - u16PrevSize);
+		}
+	}
+}
 
 /*******************************************************************************
  * Public functions
@@ -194,7 +228,11 @@ uint8_t ETH_API_u8Send(uint8_t* pData, uint16_t u16DataSize)
 {
     bool link     = false;
     static bool tempLink = false;
-    uint8_t u8SendState = (uint8_t)E_NOK_OK;
+    uint8_t u8SendState = (uint8_t)E_NOT_OK;
+    uint16_t u16ActualSize = (uint16_t)0U;
+    struct AES_ctx ctx;
+    uint8_t key[16] = "ABCDEFGHIJKLMNOP";
+    uint8_t iv[16] = "ABCDEFGHIJKLMNOP";
 
     PHY_GetLinkStatus(&phyHandle, &link);
 
@@ -204,7 +242,31 @@ uint8_t ETH_API_u8Send(uint8_t* pData, uint16_t u16DataSize)
         tempLink = link;
     }
 
-    ETH_API_s_vFillDataFrame(pData, u16DataSize);
+    u16ActualSize = ETH_API_u16GetActualSize(u16DataSize);
+
+    uint8_t* pPaddingData = (uint8_t *)malloc(u16ActualSize);
+    ETH_API_vDataPadding(pData, pPaddingData, u16ActualSize, u16DataSize);
+
+    PRINTF(" Msg before %c %c %c %c %c %c %c %c %c %c %c %c %c %c %c %c \r\n",
+    		pPaddingData[0], pPaddingData[1], pPaddingData[2], pPaddingData[3], pPaddingData[4], pPaddingData[5], pPaddingData[6], pPaddingData[7], pPaddingData[8], pPaddingData[9],
+			pPaddingData[10], pPaddingData[11], pPaddingData[12], pPaddingData[13], pPaddingData[14], pPaddingData[15]);
+
+    AES_init_ctx_iv((struct AES_ctx*)&ctx, &key[0], &iv[0]);
+    AES_CBC_encrypt_buffer((struct AES_ctx*)&ctx, pPaddingData, (size_t)u16ActualSize);
+
+    PRINTF(" Msg after %c %c %c %c %c %c %c %c %c %c %c %c %c %c %c %c \r\n",
+        		pPaddingData[0], pPaddingData[1], pPaddingData[2], pPaddingData[3], pPaddingData[4], pPaddingData[5], pPaddingData[6], pPaddingData[7], pPaddingData[8], pPaddingData[9],
+    			pPaddingData[10], pPaddingData[11], pPaddingData[12], pPaddingData[13], pPaddingData[14], pPaddingData[15]);
+
+    AES_init_ctx_iv((struct AES_ctx*)&ctx, &key[0], &iv[0]);
+    AES_CBC_decrypt_buffer((struct AES_ctx*)&ctx, pPaddingData, (size_t)u16ActualSize);
+
+    PRINTF(" Msg after %c %c %c %c %c %c %c %c %c %c %c %c %c %c %c %c \r\n",
+         		pPaddingData[0], pPaddingData[1], pPaddingData[2], pPaddingData[3], pPaddingData[4], pPaddingData[5], pPaddingData[6], pPaddingData[7], pPaddingData[8], pPaddingData[9],
+     			pPaddingData[10], pPaddingData[11], pPaddingData[12], pPaddingData[13], pPaddingData[14], pPaddingData[15]);
+
+    ETH_API_s_vFillDataFrame(pPaddingData, u16ActualSize);
+    free(pPaddingData);
 
 	if (link)
 	{
