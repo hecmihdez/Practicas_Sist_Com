@@ -10,5 +10,6 @@
 
 void STE_network_interface_init(void);
 void STE_start_tcp_echo_server(void);
+void STE_start_tcp_echo_client(void);
 
 #endif /* SIMPLE_TCP_ECHO_H_ */

@@ -43,10 +43,16 @@
 static void network_interface_init(void *arg);
 /* TCP echo connection task */
 static void tcp_listen_for_client_connections(void *arg);
+/* TCP echo client connection task */
+static void tcp_request_for_server_connections(void *arg);
 /* TCP Echo server task*/
 static void tcp_echo_server_thread(void *arg);
+/* TCP Echo client task*/
+//static void tcp_echo_client_thread(void *arg);
 /* TCP echo implementation */
 static void echo_loop_tcp(int sck);
+/* TCP echo client implementation */
+static void echo_loop_tcp_client(int sck);
 /* Set the IP address to socket address structure. */
 static int ip_port_to_sockaddr(const char *ip_str,
                                int port,
@@ -76,6 +82,16 @@ void STE_start_tcp_echo_server(void)
 {
     /* Initialize lwIP from thread */
     if (sys_thread_new("STE_tcp_listen", tcp_listen_for_client_connections, NULL, INIT_THREAD_STACKSIZE, INIT_THREAD_PRIO) == NULL)
+    {
+        LWIP_ASSERT("STE_start_tcp_echo(): Task creation failed.", 0);
+    }
+}
+
+/* Creates the TCP Echo task */
+void STE_start_tcp_echo_client(void)
+{
+    /* Initialize lwIP from thread */
+    if (sys_thread_new("STE_tcp_connect", tcp_request_for_server_connections, NULL, INIT_THREAD_STACKSIZE, INIT_THREAD_PRIO) == NULL)
     {
         LWIP_ASSERT("STE_start_tcp_echo(): Task creation failed.", 0);
     }
@@ -146,7 +162,7 @@ static void network_interface_init(void *arg)
     }
     PRINTF("************************************************\r\n");
 
-    STE_start_tcp_echo_server();
+    STE_start_tcp_echo_client();
     vTaskDelete(NULL);
 }
 
@@ -164,7 +180,7 @@ static void tcp_listen_for_client_connections(void *arg)
     struct sockaddr_in6 ipv6;
     int ret;
 
-	PRINTF("TCP echo task strat\r\n");
+	PRINTF("TCP echo task start\r\n");
 
 	af = ip_port_to_sockaddr("0.0.0.0", 57777, &ipv4, &ipv6);
 
@@ -237,6 +253,56 @@ static void tcp_listen_for_client_connections(void *arg)
 
 }
 
+static void tcp_request_for_server_connections(void *arg)
+{
+    int sck;
+    int sck_accepted[TCP_SERVER_CONNECTIONS_MAX];
+    int af;
+    struct sockaddr_in ipv4;
+    struct sockaddr_in6 ipv6;
+    int ret;
+
+	PRINTF("TCP echo task start\r\n");
+
+	af = ip_port_to_sockaddr("192.168.0.100", 57777, &ipv4, &ipv6);
+
+    PRINTF("Creating new socket.\r\n");
+    sck = socket(af, SOCK_STREAM, 0);
+    if (sck < 0)
+    {
+        PRINTF("Socket creation failed. (%d)\r\n", sck);
+        return;
+    }
+
+    ret= connect(sck, (struct sockaddr *)&ipv4, sizeof(ipv4));
+
+    if (ret < 0)
+    {
+        PRINTF("connect() failed (errno=%d)\r\n", errno);
+    }
+    else
+    {
+        PRINTF("Connection established.\r\n");
+
+        echo_loop_tcp_client(sck);
+
+//		if(sys_thread_new("tcp_echo_client_thread", tcp_echo_client_thread,(void *)&(sck), 1024, DEFAULT_THREAD_PRIO) == NULL)
+//		{
+//			PRINTF("Can not create TCP connection client thread\r\n");
+//			close(sck);
+//			sck = -1;
+//		}
+    }
+
+    if (sck != -1)
+    {
+        close(sck);
+        sck = -1;
+    }
+
+    vTaskDelete(NULL);
+}
+
 /*!
  * @brief TCP server task that echoes received data.
  *
@@ -256,6 +322,21 @@ static void tcp_echo_server_thread(void *arg)
 
     vTaskDelete(NULL);
 }
+
+//static void tcp_echo_client_thread(void *arg)
+//{
+//    int sck = *((int *)arg);
+//
+//    echo_loop_tcp_client(sck);
+//
+//    if (sck != -1)
+//    {
+//        close(sck);
+//        sck = -1;
+//    }
+//
+//    vTaskDelete(NULL);
+//}
 
 /*!
  * @brief TCP echo implementation.
@@ -301,6 +382,36 @@ static void echo_loop_tcp(int sck)
         else
         {
             PRINTF("Connection terminated. (errno=%d).\r\n", errno);
+            return;
+        }
+    }
+}
+
+static void echo_loop_tcp_client(int sck)
+{
+    int err;
+    uint8_t buf[13] = "Hector Miguel";
+
+    while (1)
+    {
+        ssize_t bytes = write(sck, &buf, (ssize_t)13);
+        if (bytes >= 0)
+        {
+            bytes = read(sck, &buf, sizeof(buf));
+
+            if (bytes > 0)
+            {
+                PRINTF("%dB came back.\r\n", bytes);
+            }
+            else
+            {
+            	PRINTF("Read() failed (errno=%d)\r\n", errno);
+            	return;
+            }
+        }
+        else
+        {
+            PRINTF("Write() failed (errno=%d)\r\n", errno);
             return;
         }
     }
