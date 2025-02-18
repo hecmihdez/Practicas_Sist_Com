@@ -96,9 +96,9 @@
 /*!
  * @brief Main function
  */
-int main(void)
-{
-	uint8_t Data[10] = "HECTOR MIG";
+//int main(void)
+//{
+//	uint8_t Data[10] = "HECTOR MIG";
 
 //    phy_config_t phyConfig = {0};
 //    uint32_t testTxNum     = 0;
@@ -195,11 +195,11 @@ int main(void)
 //    /* Build broadcast for sending. */
 //    ENET_BuildBroadCastFrame();
 
-	ETH_API_vInit();
+//	ETH_API_vInit();
 
 
-    while (1)
-    {
+//    while (1)
+//    {
         /* PHY link status update. */
 
 //        PHY_GetLinkStatus(&phyHandle, &link);
@@ -256,8 +256,8 @@ int main(void)
 //            }
 //        }
 
-    	(void)ETH_API_u8Send((uint8_t*)&Data, (uint16_t)10);
-
-    }
-
-}
+//    	(void)ETH_API_u8Send((uint8_t*)&Data, (uint16_t)10);
+//
+//    }
+//
+//}
