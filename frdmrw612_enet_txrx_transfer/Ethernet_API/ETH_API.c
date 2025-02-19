@@ -143,9 +143,9 @@ static uint16_t ETH_API_u16GetPayloadData(uint8_t* pu8Data, uint32_t u32Length, 
 	u16PayloadSize |= ((pu8Data[12]<<8)&0xFF00U);
 	u16PayloadSize |= (pu8Data[13] & 0xFFU);
 
-	for(u32Counter = 0U; u32Counter < (uint32_t)(u16PayloadSize + 4); u32Counter++)
+	for(u32Counter = 0U; u32Counter < (uint32_t)u16PayloadSize; u32Counter++)
 	{
-		if(u32Counter < u16PayloadSize)
+		if(u32Counter < (uint32_t)(u16PayloadSize-4))
 		{
 			pu8PayloadData[u32Counter] = pu8Data[u32Counter + HEADER_OFFSET];
 		}
@@ -207,6 +207,7 @@ void ETH_API_vInit(void)
      */
     ENET_GetDefaultConfig(&config);
 
+    config.macSpecialConfig = kENET_ControlRxBroadCastRejectEnable;
     /* The miiMode should be set according to the different PHY interfaces. */
     config.miiMode = kENET_RmiiMode;
     phyConfig.phyAddr = EXAMPLE_PHY_ADDRESS;
@@ -248,6 +249,7 @@ void ETH_API_vInit(void)
     config.miiSpeed  = (enet_mii_speed_t)speed;
     config.miiDuplex = (enet_mii_duplex_t)duplex;
 
+//    SILICONID_ConvertToMacAddr(&g_macAddr);
     /* Init the ENET. */
     ENET_Init(EXAMPLE_ENET, &g_handle, &config, &buffConfig[0], &g_macAddr[0], EXAMPLE_CLOCK_FREQ);
     ENET_ActiveRead(EXAMPLE_ENET);
@@ -287,7 +289,6 @@ uint8_t ETH_API_u8Send(uint8_t* pu8Data, uint16_t u16DataSize)
 
 	if (link)
 	{
-		SDK_DelayAtLeastUs(10000, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
 		if (kStatus_Success ==
 			ENET_SendFrame(EXAMPLE_ENET, &g_handle, &g_frame[0], u32DataLength, 0, false, NULL))
 		{
@@ -337,20 +338,20 @@ uint8_t ETH_API_u8Receive(uint8_t* pu8DataBuff)
 				u16DataSize = ETH_API_u16GetPayloadData(data, length, (uint8_t*)&pu8PayloadData[0], (uint8_t*)&pu8CRCMsg[0]);
 
 				ETH_API_vInitCrc32(base, 0xFFFFFFFFU);
-				CRC_WriteData(base, (uint8_t *)&pu8PayloadData[0], (size_t)u16DataSize);
+				CRC_WriteData(base, (uint8_t *)&pu8PayloadData[0], (size_t)(u16DataSize-4));
 				checksum32 = CRC_Get32bitResult(base);
 
-				u32CRCMsg |= pu8CRCMsg[3] & 0xFFU;
-				u32CRCMsg |= (pu8CRCMsg[2]<<8) & 0xFF00U;
-				u32CRCMsg |= (pu8CRCMsg[1]<<16) & 0xFF0000U;
-				u32CRCMsg |= (pu8CRCMsg[0]<<24) & 0xFF000000U;
+				u32CRCMsg |= (pu8CRCMsg[3]<<24) & 0xFF000000U;
+				u32CRCMsg |= (pu8CRCMsg[2]<<16) & 0xFF0000U;
+				u32CRCMsg |= (pu8CRCMsg[1]<<8) & 0xFF00U;
+				u32CRCMsg |= (pu8CRCMsg[0]) & 0xFFU;
 
 				if(checksum32 == u32CRCMsg)
 				{
 					AES_init_ctx_iv((struct AES_ctx*)&ctx, &key[0], &iv[0]);
 					AES_CBC_decrypt_buffer((struct AES_ctx*)&ctx, pu8PayloadData, (size_t)u16DataSize);
 
-					for(uint8_t u8IndexData = 0U; u8IndexData < u16DataSize; u8IndexData++)
+					for(uint8_t u8IndexData = 0U; u8IndexData < (u16DataSize-4); u8IndexData++)
 					{
 						pu8DataBuff[u8IndexData] = pu8PayloadData[u8IndexData];
 					}

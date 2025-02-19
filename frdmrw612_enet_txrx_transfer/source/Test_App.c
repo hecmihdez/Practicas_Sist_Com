@@ -87,20 +87,26 @@ int main(void)
 
 	ETH_API_vInit();
 
-	for(u8IndexMsg = 0U; u8IndexMsg < TOTAL_MSGS; u8IndexMsg++)
+	while(1)
 	{
-		u8SendState = ETH_API_u8Send((uint8_t*)&stMsgData[u8IndexMsg].u8MsgToSend, (uint16_t)stMsgData[u8IndexMsg].u16Size);
-
-		if(u8SendState == (uint8_t)E_OK)
+		for(u8IndexMsg = 0U; u8IndexMsg < TOTAL_MSGS; u8IndexMsg++)
 		{
-			u8RxState = ETH_API_u8Receive((uint8_t*)pu8RxData);
+			SDK_DelayAtLeastUs(1000000, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+			u8SendState = ETH_API_u8Send((uint8_t*)&stMsgData[u8IndexMsg].u8MsgToSend, (uint16_t)stMsgData[u8IndexMsg].u16Size);
 
-			if(u8RxState == (uint8_t)E_OK)
+			if(u8SendState == (uint8_t)E_OK)
 			{
-				 PRINTF(" A frame received.");
+				SDK_DelayAtLeastUs(10000, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+				u8RxState = ETH_API_u8Receive((uint8_t*)pu8RxData);
+
+				if(u8RxState == (uint8_t)E_OK)
+				{
+					 PRINTF(" \r\nFrame received!\r\n");
+				}
 			}
 		}
 	}
+
 }
 
 
