@@ -68,22 +68,10 @@ int main(void)
 	};
 
 
-	stMsgData[0].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[0].u8MsgToSend));
-	stMsgData[1].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[1].u8MsgToSend));
-	stMsgData[2].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[2].u8MsgToSend));
-	stMsgData[3].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[3].u8MsgToSend));
-	stMsgData[4].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[4].u8MsgToSend));
-	stMsgData[5].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[5].u8MsgToSend));
-	stMsgData[6].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[6].u8MsgToSend));
-	stMsgData[7].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[7].u8MsgToSend));
-	stMsgData[8].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[8].u8MsgToSend));
-	stMsgData[9].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[9].u8MsgToSend));
-	stMsgData[10].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[10].u8MsgToSend));
-	stMsgData[11].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[11].u8MsgToSend));
-	stMsgData[12].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[12].u8MsgToSend));
-	stMsgData[13].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[13].u8MsgToSend));
-	stMsgData[14].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[14].u8MsgToSend));
-	stMsgData[15].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[15].u8MsgToSend));
+	for(uint8_t u8Index = 0U; u8Index < TOTAL_MSGS; u8Index++)
+	{
+		stMsgData[u8Index].u16Size = u16GetMsgSize((uint8_t*)(&stMsgData[u8Index].u8MsgToSend));
+	}
 
 	ETH_API_vInit();
 
