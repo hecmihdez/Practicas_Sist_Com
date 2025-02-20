@@ -29,6 +29,7 @@
 #define ENET_RXBUFF_SIZE       (ENET_FRAME_MAX_FRAMELEN)
 #define ENET_TXBUFF_SIZE       (ENET_FRAME_MAX_FRAMELEN)
 #define ENET_DATA_LENGTH       (1000)
+#define ETH_API_MAX_DATA_LENGTH (1472)
 #define ENET_TRANSMIT_DATA_NUM (20)
 #ifndef APP_ENET_BUFF_ALIGNMENT
 #define APP_ENET_BUFF_ALIGNMENT ENET_BUFF_ALIGNMENT
@@ -134,7 +135,7 @@ static void ETH_API_vInitCrc32(CRC_Type *base, uint32_t seed)
     CRC_Init(base, &config);
 }
 
-static uint16_t ETH_API_u16GetPayloadData(uint8_t* pu8Data, uint32_t u32Length, uint8_t* pu8PayloadData, uint8_t* pu8CRCMsg)
+static uint16_t ETH_API_u16GetPayloadData(uint8_t* pu8Data, uint8_t* pu8PayloadData, uint8_t* pu8CRCMsg)
 {
 	uint32_t u32Counter = 0U;
 	uint32_t u32CounterCRC = 0U;
@@ -249,7 +250,6 @@ void ETH_API_vInit(void)
     config.miiSpeed  = (enet_mii_speed_t)speed;
     config.miiDuplex = (enet_mii_duplex_t)duplex;
 
-//    SILICONID_ConvertToMacAddr(&g_macAddr);
     /* Init the ENET. */
     ENET_Init(EXAMPLE_ENET, &g_handle, &config, &buffConfig[0], &g_macAddr[0], EXAMPLE_CLOCK_FREQ);
     ENET_ActiveRead(EXAMPLE_ENET);
@@ -266,29 +266,29 @@ uint8_t ETH_API_u8Send(uint8_t* pu8Data, uint16_t u16DataSize)
     uint32_t u32DataLength = 0U;
 
     assert(pu8Data != (uint8_t*)NULL);
-    assert(u16DataSize > (uint16_t)0);
+    assert((u16DataSize > (uint16_t)0)&&(u16DataSize < (uint16_t)ETH_API_MAX_DATA_LENGTH));
 
     PHY_GetLinkStatus(&phyHandle, &link);
 
-    u16ActualSize = ETH_API_u16GetActualSize(u16DataSize);
-
-    uint8_t* pPaddingData = (uint8_t *)malloc(u16ActualSize);
-    ETH_API_vFillDataPadding(pu8Data, pPaddingData, u16ActualSize, u16DataSize);
-
-    AES_init_ctx_iv((struct AES_ctx*)&ctx, &key[0], &iv[0]);
-    AES_CBC_encrypt_buffer((struct AES_ctx*)&ctx, pPaddingData, (size_t)u16ActualSize);
-
-    ETH_API_vInitCrc32(base, 0xFFFFFFFFU);
-    CRC_WriteData(base, (uint8_t *)&pPaddingData[0], (size_t)u16ActualSize);
-    checksum32 = CRC_Get32bitResult(base);
-
-    ETH_API_s_vFillDataFrame(pPaddingData, u16ActualSize, checksum32);
-    free(pPaddingData);
-
-    u32DataLength = (uint32_t)(u16ActualSize + HEADER_OFFSET + sizeof(checksum32));
-
 	if (link)
 	{
+	    u16ActualSize = ETH_API_u16GetActualSize(u16DataSize);
+
+	    uint8_t* pPaddingData = (uint8_t *)malloc(u16ActualSize);
+	    ETH_API_vFillDataPadding(pu8Data, pPaddingData, u16ActualSize, u16DataSize);
+
+	    AES_init_ctx_iv((struct AES_ctx*)&ctx, &key[0], &iv[0]);
+	    AES_CBC_encrypt_buffer((struct AES_ctx*)&ctx, pPaddingData, (size_t)u16ActualSize);
+
+	    ETH_API_vInitCrc32(base, 0xFFFFFFFFU);
+	    CRC_WriteData(base, (uint8_t *)&pPaddingData[0], (size_t)u16ActualSize);
+	    checksum32 = CRC_Get32bitResult(base);
+
+	    ETH_API_s_vFillDataFrame(pPaddingData, u16ActualSize, checksum32);
+	    free(pPaddingData);
+
+	    u32DataLength = (uint32_t)(u16ActualSize + HEADER_OFFSET + sizeof(checksum32));
+
 		if (kStatus_Success ==
 			ENET_SendFrame(EXAMPLE_ENET, &g_handle, &g_frame[0], u32DataLength, 0, false, NULL))
 		{
@@ -335,7 +335,7 @@ uint8_t ETH_API_u8Receive(uint8_t* pu8DataBuff)
 
 			if (status == kStatus_Success)
 			{
-				u16DataSize = ETH_API_u16GetPayloadData(data, length, (uint8_t*)&pu8PayloadData[0], (uint8_t*)&pu8CRCMsg[0]);
+				u16DataSize = ETH_API_u16GetPayloadData(data, (uint8_t*)&pu8PayloadData[0], (uint8_t*)&pu8CRCMsg[0]);
 
 				ETH_API_vInitCrc32(base, 0xFFFFFFFFU);
 				CRC_WriteData(base, (uint8_t *)&pu8PayloadData[0], (size_t)(u16DataSize-4));

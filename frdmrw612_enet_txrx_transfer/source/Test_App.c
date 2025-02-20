@@ -11,7 +11,7 @@
 
 #define E_OK				   (1)
 #define E_NOT_OK			   (0)
-#define ENET_DATA_LENGTH       (1000)
+#define ENET_DATA_LENGTH       (1488)
 #define TOTAL_MSGS			   (16)
 
 typedef struct
@@ -101,7 +101,7 @@ int main(void)
 
 				if(u8RxState == (uint8_t)E_OK)
 				{
-					 PRINTF(" \r\nFrame received!\r\n");
+					 PRINTF("Frame received!\r\n");
 				}
 			}
 		}
