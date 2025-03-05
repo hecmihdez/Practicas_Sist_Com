@@ -148,8 +148,8 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
  */
 static void mqtt_subscribe_topics(mqtt_client_t *client)
 {
-    static const char *topics[] = {"lwip_topic/#", "lwip_other/#"};
-    int qos[]                   = {0, 1};
+    static const char *topics[] = {"lwip_topic/CAN/FIGO/Air", "lwip_topic/CAN/FIGO/Direccion", "lwip_topic/CAN/FIGO/Luces", "lwip_topic/CAN/FIGO/Ventanas"};
+    int qos[]                   = {0, 0, 0, 0};
     err_t err;
     int i;
 
@@ -252,14 +252,20 @@ static void mqtt_message_published_cb(void *arg, err_t err)
  */
 static void publish_message(void *ctx)
 {
-    static const char *topic   = "lwip_topic/100";
-    static const char *message = "message from board";
+	static const char *topics[] = {"lwip_topic/CAN/FIGO/Velocidad", "lwip_topic/CAN/FIGO/Rpm", "lwip_topic/CAN/FIGO/Acelerador", "lwip_topic/CAN/FIGO/Temperatura", "lwip_topic/CAN/FIGO/Frenos"};
+//    static const char *topic   = "lwip_topic/100";
+//    static const char *message = "message from board";
+	static const char *messages[] = {"200", "5000", "Acelerando", "40", "Frenando"};
+	int i;
 
     LWIP_UNUSED_ARG(ctx);
 
-    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    for (i = 0; i < ARRAY_SIZE(topics); i++)
+    {
+    	PRINTF("Going to publish to the topic \"%s\"...\r\n", topics[i]);
 
-    mqtt_publish(mqtt_client, topic, message, strlen(message), 1, 0, mqtt_message_published_cb, (void *)topic);
+    	mqtt_publish(mqtt_client, topics[i], messages[i], strlen(messages[i]), 1, 0, mqtt_message_published_cb, (void *)topics[i]);
+    }
 }
 
 /*!
