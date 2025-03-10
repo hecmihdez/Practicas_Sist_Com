@@ -14,6 +14,7 @@
 #include "app.h"
 #include "fsl_phy.h"
 #include "mqtt_freertos.h"
+#include "fsl_rtc.h"
 
 #include "lwip/opt.h"
 #include "lwip/api.h"
@@ -53,6 +54,25 @@ static phy_handle_t phyHandle;
 /*******************************************************************************
  * Code
  ******************************************************************************/
+
+/*!
+ * @brief ISR for Alarm interrupt
+ *
+ * This function changes the state of busyWait.
+ */
+//void RTC_IRQHandler(void)
+//{
+//    if (RTC_GetStatusFlags(RTC) & kRTC_AlarmFlag)
+//    {
+////        busyWait = false;
+//
+//    	PRINTF("\r\n Alarm occurs !!!! ");
+//        /* Clear alarm flag */
+//        RTC_ClearStatusFlags(RTC, kRTC_AlarmFlag);
+//    }
+//    SDK_ISR_EXIT_BARRIER;
+//}
+
 
 /*!
  * @brief Initializes lwIP stack.
@@ -113,7 +133,38 @@ static void stack_init(void *arg)
  */
 int main(void)
 {
+    uint32_t currSeconds;
+    rtc_datetime_t date;
+
     BOARD_InitHardware();
+
+//    /* Init RTC */
+//    RTC_Init(RTC);
+//
+//    /* Set a start date time and start RT */
+//    date.year   = 2025U;
+//    date.month  = 3U;
+//    date.day    = 10U;
+//    date.hour   = 19U;
+//    date.minute = 0;
+//    date.second = 0;
+//
+//    RTC_EnableTimer(RTC, false);
+//
+//    RTC_SetDatetime(RTC, &date);
+//
+//    EnableIRQ(RTC_IRQn);
+//
+//    RTC_EnableTimer(RTC, true);
+//
+//    /* Read the RTC seconds register to get current time in seconds */
+//    currSeconds = RTC_GetSecondsTimerCount(RTC);
+//
+//    /* Add alarm seconds to current time */
+//    currSeconds += 10;
+//
+//    /* Set alarm time in seconds */
+//    RTC_SetSecondsTimerMatch(RTC, currSeconds);
 
     /* Initialize lwIP from thread */
     if (sys_thread_new("main", stack_init, NULL, INIT_THREAD_STACKSIZE, INIT_THREAD_PRIO) == NULL)

@@ -14,6 +14,7 @@
 
 #include "board.h"
 #include "fsl_silicon_id.h"
+#include "fsl_rtc.h"
 
 #include "lwip/opt.h"
 #include "lwip/api.h"
@@ -48,6 +49,12 @@
 /*! @brief Priority of the temporary initialization thread. */
 #define APP_THREAD_PRIO DEFAULT_THREAD_PRIO
 
+/*! @brief Stack size of the temporary initialization thread. */
+#define PUBLISH_THREAD_STACKSIZE 1024
+
+/*! @brief Priority of the temporary initialization thread. */
+#define PUBLISH_THREAD_PRIO DEFAULT_THREAD_PRIO
+
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -60,6 +67,9 @@ static void connect_to_mqtt(void *ctx);
 
 /*! @brief MQTT client data. */
 static mqtt_client_t *mqtt_client;
+
+static sys_thread_t xHandleP;
+static volatile bool Flag = false;
 
 /*! @brief MQTT client ID string. */
 static char client_id[(SILICONID_MAX_LENGTH * 2) + 5];
@@ -88,6 +98,37 @@ static volatile bool connected = false;
 /*******************************************************************************
  * Code
  ******************************************************************************/
+
+/*!
+ * @brief ISR for Alarm interrupt
+ *
+ * This function changes the state of busyWait.
+ */
+void RTC_IRQHandler(void)
+{
+//	BaseType_t xYieldRequired;
+
+    if (RTC_GetStatusFlags(RTC) & kRTC_AlarmFlag)
+    {
+//        busyWait = false;
+
+    	PRINTF("\r\n Alarm occurs !!!! ");
+
+    	Flag = true;
+
+        /* Clear alarm flag */
+        RTC_ClearStatusFlags(RTC, kRTC_AlarmFlag);
+
+        // Resume the suspended task.
+//        xYieldRequired = xTaskResumeFromISR( xHandleP );
+//
+//        // We should switch context so the ISR returns to a different task.
+//        // NOTE:  How this is done depends on the port you are using.  Check
+//        // the documentation and examples for your port.
+//        portYIELD_FROM_ISR( xYieldRequired );
+    }
+    SDK_ISR_EXIT_BARRIER;
+}
 
 /*!
  * @brief Called when subscription request finishes.
@@ -252,20 +293,120 @@ static void mqtt_message_published_cb(void *arg, err_t err)
  */
 static void publish_message(void *ctx)
 {
-	static const char *topics[] = {"lwip_topic/CAN/FIGO/Velocidad", "lwip_topic/CAN/FIGO/Rpm", "lwip_topic/CAN/FIGO/Acelerador", "lwip_topic/CAN/FIGO/Temperatura", "lwip_topic/CAN/FIGO/Frenos"};
-//    static const char *topic   = "lwip_topic/100";
-//    static const char *message = "message from board";
-	static const char *messages[] = {"200", "5000", "Acelerando", "40", "Frenando"};
+//	static const char *topics[] = {"lwip_topic/CAN/FIGO/Velocidad", "lwip_topic/CAN/FIGO/Rpm", "lwip_topic/CAN/FIGO/Acelerador", "lwip_topic/CAN/FIGO/Temperatura"};
+    static const char *topic   = "lwip_topic/100";
+    static const char *message = "message from board";
+//	static const char *messages[] = {"200", "5000", "Acelerando", "40"};
 	int i;
 
     LWIP_UNUSED_ARG(ctx);
 
-    for (i = 0; i < ARRAY_SIZE(topics); i++)
-    {
-    	PRINTF("Going to publish to the topic \"%s\"...\r\n", topics[i]);
+//    for (i = 0; i < ARRAY_SIZE(topics); i++)
+//    {
+    	PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
 
-    	mqtt_publish(mqtt_client, topics[i], messages[i], strlen(messages[i]), 1, 0, mqtt_message_published_cb, (void *)topics[i]);
+    	mqtt_publish(mqtt_client, topic, message, strlen(message), 1, 0, mqtt_message_published_cb, (void *)topic);
+//    }
+}
+
+//static void publish_msgs2(void *arg)
+//{
+//	err_t err;
+//	int i;
+//    uint32_t currSeconds;
+//
+//	LWIP_UNUSED_ARG(arg);
+//
+//	if (connected)
+//	{
+//		err = tcpip_callback(publish_message, NULL);
+//		if (err != ERR_OK)
+//		{
+//			PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+//		}
+//	}
+//
+//	/* Read the RTC seconds register to get current time in seconds */
+//	currSeconds = RTC_GetSecondsTimerCount(RTC);
+//
+//	/* Add alarm seconds to current time */
+//	currSeconds += 10;
+//
+//	/* Set alarm time in seconds */
+//	RTC_SetSecondsTimerMatch(RTC, currSeconds);
+//
+//	Flag = false;
+//
+//	vTaskSuspend(NULL);
+//}
+
+static void publish_msgs(void *arg)
+{
+	err_t err;
+	int i;
+    uint32_t currSeconds;
+
+    LWIP_UNUSED_ARG(arg);
+
+	/* Read the RTC seconds register to get current time in seconds */
+	currSeconds = RTC_GetSecondsTimerCount(RTC);
+
+	/* Add alarm seconds to current time */
+	currSeconds += 5;
+
+	/* Set alarm time in seconds */
+	RTC_SetSecondsTimerMatch(RTC, currSeconds);
+
+
+//    xHandleP = sys_thread_new("publish_msgs2", publish_msgs2, NULL, PUBLISH_THREAD_STACKSIZE, PUBLISH_THREAD_PRIO);
+
+    for(;;)
+    {
+    	if((Flag == true))
+    	{
+//    		vTaskResume(xHandleP);
+
+    		if (connected)
+    		{
+    			err = tcpip_callback(publish_message, NULL);
+    			if (err != ERR_OK)
+    			{
+    				PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+    			}
+    		}
+
+    		/* Read the RTC seconds register to get current time in seconds */
+    		currSeconds = RTC_GetSecondsTimerCount(RTC);
+
+    		/* Add alarm seconds to current time */
+    		currSeconds += 5;
+
+    		/* Set alarm time in seconds */
+    		RTC_SetSecondsTimerMatch(RTC, currSeconds);
+
+    		Flag = false;
+    	}
     }
+
+//	if (connected)
+//	{
+//		err = tcpip_callback(publish_message, NULL);
+//		if (err != ERR_OK)
+//		{
+//			PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+//		}
+//	}
+//
+//	/* Read the RTC seconds register to get current time in seconds */
+//	currSeconds = RTC_GetSecondsTimerCount(RTC);
+//
+//	/* Add alarm seconds to current time */
+//	currSeconds += 10;
+//
+//	/* Set alarm time in seconds */
+//	RTC_SetSecondsTimerMatch(RTC, currSeconds);
+
+//	vTaskSuspend(NULL);
 }
 
 /*!
@@ -276,6 +417,7 @@ static void app_thread(void *arg)
     struct netif *netif = (struct netif *)arg;
     err_t err;
     int i;
+    rtc_datetime_t date;
 
     PRINTF("\r\nIPv4 Address     : %s\r\n", ipaddr_ntoa(&netif->ip_addr));
     PRINTF("IPv4 Subnet mask : %s\r\n", ipaddr_ntoa(&netif->netmask));
@@ -312,21 +454,60 @@ static void app_thread(void *arg)
         PRINTF("Failed to obtain IP address: %d.\r\n", err);
     }
 
-    /* Publish some messages */
-    for (i = 0; i < 5;)
-    {
-        if (connected)
-        {
-            err = tcpip_callback(publish_message, NULL);
-            if (err != ERR_OK)
-            {
-                PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-            }
-            i++;
-        }
 
-        sys_msleep(1000U);
-    }
+//    while(connected == false)
+//    {
+//    	sys_msleep(1000U);
+//    }
+//
+//    if (connected)
+//    {
+
+
+		/* Publish some messages */
+	    for (i = 0; i < 5;)
+	    {
+	        if (connected)
+	        {
+//	            err = tcpip_callback(publish_message, NULL);
+//	            if (err != ERR_OK)
+//	            {
+//	                PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+//	            }
+	            i++;
+	        }
+
+	        sys_msleep(1000U);
+	    }
+
+
+	/* Init RTC */
+	RTC_Init(RTC);
+
+	/* Set a start date time and start RT */
+	date.year   = 2025U;
+	date.month  = 3U;
+	date.day    = 10U;
+	date.hour   = 19U;
+	date.minute = 0;
+	date.second = 0;
+
+	RTC_EnableTimer(RTC, false);
+
+	RTC_SetDatetime(RTC, &date);
+
+//	EnableIRQWithPriority(RTC_IRQn, 2);
+	EnableIRQ(RTC_IRQn);
+
+	RTC_EnableTimer(RTC, true);
+
+//		xHandleP = sys_thread_new("publish_msgs", publish_msgs, NULL, PUBLISH_THREAD_STACKSIZE, PUBLISH_THREAD_PRIO);
+
+		if (sys_thread_new("publish_msgs", publish_msgs, NULL, PUBLISH_THREAD_STACKSIZE, PUBLISH_THREAD_PRIO) == NULL)
+		{
+			LWIP_ASSERT("main(): Task creation failed.", 0);
+		}
+//    }
 
     vTaskDelete(NULL);
 }
