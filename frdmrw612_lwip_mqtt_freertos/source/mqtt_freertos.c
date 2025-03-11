@@ -15,6 +15,8 @@
 #include "board.h"
 #include "fsl_silicon_id.h"
 #include "fsl_rtc.h"
+#include "stdlib.h"
+#include "time.h"
 
 #include "lwip/opt.h"
 #include "lwip/api.h"
@@ -54,6 +56,21 @@
 
 /*! @brief Priority of the temporary initialization thread. */
 #define PUBLISH_THREAD_PRIO DEFAULT_THREAD_PRIO
+
+
+typedef enum {
+	Accelerator = 0,
+	Brake,
+	RPM,
+	Veloc,
+	Temp,
+	TotalMsgs
+}enMsgs;
+
+typedef struct {
+	uint8_t u8IndexMsg;
+	uint8_t MsgPayLoad[5];
+}stMsgStruct;
 
 /*******************************************************************************
  * Prototypes
@@ -293,19 +310,39 @@ static void mqtt_message_published_cb(void *arg, err_t err)
  */
 static void publish_message(void *ctx)
 {
-//	static const char *topics[] = {"lwip_topic/CAN/FIGO/Velocidad", "lwip_topic/CAN/FIGO/Rpm", "lwip_topic/CAN/FIGO/Acelerador", "lwip_topic/CAN/FIGO/Temperatura"};
-    static const char *topic   = "lwip_topic/100";
-    static const char *message = "message from board";
+	static const char *topics[] = {"lwip_topic/CAN/FIGO/Acelerador", "lwip_topic/CAN/FIGO/Frenos", "lwip_topic/CAN/FIGO/Rpm", "lwip_topic/CAN/FIGO/Velocidad", "lwip_topic/CAN/FIGO/Temperatura"};
+//    static const char *topic   = "lwip_topic/100";
+//    static const char *topic   = "lwip_topic/CAN/FIGO/Velocidad";
+
+	stMsgStruct* pMsg;
+    uint8_t msg[5];
+//    uint8_t *p;
+    char *message;
+
+    pMsg = (stMsgStruct*)ctx;
+
+//    p = (uint8_t*)ctx;
+
+    for(uint8_t u8i = 0; u8i < 5; u8i++)
+    {
+    	msg[u8i] = pMsg->MsgPayLoad[u8i];
+    }
+
+//    msg = (uint8_t*)ctx;
+
+    PRINTF("%c", msg[0]);
+
+//    message = (char*)ctx;
 //	static const char *messages[] = {"200", "5000", "Acelerando", "40"};
 	int i;
 
-    LWIP_UNUSED_ARG(ctx);
+   // LWIP_UNUSED_ARG(ctx);
 
 //    for (i = 0; i < ARRAY_SIZE(topics); i++)
 //    {
-    	PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    	PRINTF("Going to publish to the topic \"%s\"...\r\n", topics[pMsg->u8IndexMsg]);
 
-    	mqtt_publish(mqtt_client, topic, message, strlen(message), 1, 0, mqtt_message_published_cb, (void *)topic);
+    	mqtt_publish(mqtt_client, topics[pMsg->u8IndexMsg], msg, strlen(msg), 1, 0, mqtt_message_published_cb, (void *)topics[pMsg->u8IndexMsg]);
 //    }
 }
 
@@ -340,19 +377,107 @@ static void publish_message(void *ctx)
 //	vTaskSuspend(NULL);
 //}
 
+static void CalcValues(uint8_t* pSensorsVal)
+{
+	uint8_t u8Accelerator = 0U;
+	uint8_t u8Brake = 0U;
+	uint8_t u8RPM = 0U;
+	static uint8_t u8Vel = 0U;
+	static uint8_t u8Temp = 0U;
+
+	u8Accelerator = rand() % 2;
+
+	if(u8Accelerator)
+	{
+		if(u8Vel < 190)
+		{
+			u8Vel = u8Vel + (rand() % 10);
+		}
+
+		if(u8Temp < 45)
+		{
+			u8Temp = u8Temp + ((rand() % 5));
+		}
+	}
+	else
+	{
+		if(u8Vel > 9)
+		{
+			u8Vel = u8Vel - (rand() % 10);
+		}
+
+		if(u8Temp > 5)
+		{
+			u8Temp = u8Temp - ((rand() % 5));
+		}
+	}
+
+	u8RPM = u8Vel * 30;
+	u8Brake = !(u8Accelerator);
+
+	pSensorsVal[Accelerator] = u8Accelerator;
+	pSensorsVal[Brake] = u8Brake;
+	pSensorsVal[RPM] = u8RPM;
+	pSensorsVal[Veloc] = u8Vel;
+	pSensorsVal[Temp] = u8Temp;
+}
+
+static void ConvertToString(uint8_t u8DecimalValue, uint8_t* StringMsg)
+{
+	uint8_t u8Aux = 0U;
+	uint8_t u8Counter = 0U;
+	uint8_t u8Index = 0U;
+	uint8_t u8Dig = 0U;
+
+	u8Aux = u8DecimalValue;
+
+	if(u8Aux == 0)
+	{
+		u8Counter = 1;
+	}
+	else
+	{
+		while(u8Aux > 0)
+		{
+			u8Aux = u8Aux/10;
+			u8Counter++;
+		}
+	}
+
+	StringMsg[u8Counter] = '\0';
+	u8Aux = u8DecimalValue;
+	u8Index = u8Counter - 1;
+
+	while((u8Index >= 0)&&(u8Index < u8Counter))
+	{
+		u8Dig = u8Aux%10;
+		u8Aux = u8Aux/10;
+		StringMsg[u8Index] = u8Dig + '0';
+		u8Index--;
+	}
+}
+
 static void publish_msgs(void *arg)
 {
+	uint8_t u8MsgsValues[TotalMsgs];
+//	uint8_t Msgs[TotalMsgs][20];
+	stMsgStruct Msgs[TotalMsgs];
+
+	static uint8_t u8Vel;
+	uint8_t msg[2];
 	err_t err;
 	int i;
     uint32_t currSeconds;
 
     LWIP_UNUSED_ARG(arg);
 
+    srand(time(0));
+
 	/* Read the RTC seconds register to get current time in seconds */
 	currSeconds = RTC_GetSecondsTimerCount(RTC);
 
 	/* Add alarm seconds to current time */
-	currSeconds += 5;
+	currSeconds += 2;
 
 	/* Set alarm time in seconds */
 	RTC_SetSecondsTimerMatch(RTC, currSeconds);
@@ -366,12 +491,30 @@ static void publish_msgs(void *arg)
     	{
 //    		vTaskResume(xHandleP);
 
+    		CalcValues((uint8_t*)u8MsgsValues);
+
+    		for(uint8_t u8i = 0U; u8i < TotalMsgs; u8i++)
+    		{
+    			ConvertToString(u8MsgsValues[u8i], (uint8_t*)&Msgs[u8i].MsgPayLoad);
+    			Msgs[u8i].u8IndexMsg = u8i;
+    		}
+
+//    		msg[1] = '\0';
+//    		msg[0] = u8Vel + '0';
+
     		if (connected)
     		{
-    			err = tcpip_callback(publish_message, NULL);
-    			if (err != ERR_OK)
+//    			err = tcpip_callback(publish_message, (void*)msg);
+
+    			for(uint8_t u8Index = 0U; u8Index < TotalMsgs; u8Index++)
     			{
-    				PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+    				err = tcpip_callback(publish_message, (void*)&Msgs[u8Index]);
+
+					if (err != ERR_OK)
+					{
+						PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+					}
+					sys_msleep(500U);
     			}
     		}
 
@@ -379,7 +522,7 @@ static void publish_msgs(void *arg)
     		currSeconds = RTC_GetSecondsTimerCount(RTC);
 
     		/* Add alarm seconds to current time */
-    		currSeconds += 5;
+    		currSeconds += 2;
 
     		/* Set alarm time in seconds */
     		RTC_SetSecondsTimerMatch(RTC, currSeconds);
