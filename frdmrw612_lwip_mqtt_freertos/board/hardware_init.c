@@ -48,6 +48,7 @@ void BOARD_InitHardware(void)
 {
     gpio_pin_config_t gpio_config = {kGPIO_DigitalOutput, 1U};
 
+    BOARD_InitPins();
     BOARD_InitBootPins();
     BOARD_InitBootClocks();
     BOARD_InitDebugConsole();

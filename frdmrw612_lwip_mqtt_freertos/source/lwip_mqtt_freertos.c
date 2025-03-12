@@ -41,6 +41,11 @@
 /*! @brief Priority of the temporary lwIP initialization thread. */
 #define INIT_THREAD_PRIO DEFAULT_THREAD_PRIO
 
+#define APP_BOARD_TEST_LED_PORT BOARD_LED_BLUE_GPIO_PORT
+#define APP_BOARD_TEST_LED_PIN  BOARD_LED_BLUE_GPIO_PIN
+#define APP_BOARD_TEST_LED_GREEN_PIN  12U
+#define APP_BOARD_TEST_LED_RED_PIN  1U
+
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -54,26 +59,6 @@ static phy_handle_t phyHandle;
 /*******************************************************************************
  * Code
  ******************************************************************************/
-
-/*!
- * @brief ISR for Alarm interrupt
- *
- * This function changes the state of busyWait.
- */
-//void RTC_IRQHandler(void)
-//{
-//    if (RTC_GetStatusFlags(RTC) & kRTC_AlarmFlag)
-//    {
-////        busyWait = false;
-//
-//    	PRINTF("\r\n Alarm occurs !!!! ");
-//        /* Clear alarm flag */
-//        RTC_ClearStatusFlags(RTC, kRTC_AlarmFlag);
-//    }
-//    SDK_ISR_EXIT_BARRIER;
-//}
-
-
 /*!
  * @brief Initializes lwIP stack.
  *
@@ -133,38 +118,22 @@ static void stack_init(void *arg)
  */
 int main(void)
 {
-    uint32_t currSeconds;
-    rtc_datetime_t date;
+
+    /* Define the init structure for the output LED pin*/
+    gpio_pin_config_t led_config = {
+        kGPIO_DigitalOutput,
+        0,
+    };
 
     BOARD_InitHardware();
 
-//    /* Init RTC */
-//    RTC_Init(RTC);
-//
-//    /* Set a start date time and start RT */
-//    date.year   = 2025U;
-//    date.month  = 3U;
-//    date.day    = 10U;
-//    date.hour   = 19U;
-//    date.minute = 0;
-//    date.second = 0;
-//
-//    RTC_EnableTimer(RTC, false);
-//
-//    RTC_SetDatetime(RTC, &date);
-//
-//    EnableIRQ(RTC_IRQn);
-//
-//    RTC_EnableTimer(RTC, true);
-//
-//    /* Read the RTC seconds register to get current time in seconds */
-//    currSeconds = RTC_GetSecondsTimerCount(RTC);
-//
-//    /* Add alarm seconds to current time */
-//    currSeconds += 10;
-//
-//    /* Set alarm time in seconds */
-//    RTC_SetSecondsTimerMatch(RTC, currSeconds);
+    GPIO_PortInit(GPIO, APP_BOARD_TEST_LED_PORT);
+    GPIO_PinInit(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_PIN, &led_config);
+    GPIO_PinInit(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_GREEN_PIN, &led_config);
+    GPIO_PinInit(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_RED_PIN, &led_config);
+    GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_PIN, 1);
+    GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_GREEN_PIN, 1);
+    GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_RED_PIN, 1);
 
     /* Initialize lwIP from thread */
     if (sys_thread_new("main", stack_init, NULL, INIT_THREAD_STACKSIZE, INIT_THREAD_PRIO) == NULL)
