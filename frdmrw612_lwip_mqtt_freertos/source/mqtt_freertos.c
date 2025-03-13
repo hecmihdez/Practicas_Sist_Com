@@ -340,7 +340,9 @@ static void mqtt_message_published_cb(void *arg, err_t err)
 
     if (err == ERR_OK)
     {
-//        PRINTF("Published to the topic \"%s\".\r\n", topic);
+#ifdef TEST_APP
+        PRINTF("Published to the topic \"%s\".\r\n", topic);
+#endif
     }
     else
     {
@@ -366,8 +368,9 @@ static void publish_message(void *ctx)
     }
 
 	int i;
-
-//    PRINTF("Going to publish to the topic \"%s\"...\r\n", topics[pMsg->u8IndexMsg]);
+#ifdef TEST_APP
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topics[pMsg->u8IndexMsg]);
+#endif
 
     mqtt_publish(mqtt_client, topics[pMsg->u8IndexMsg], msg, strlen(msg), 1, 0, mqtt_message_published_cb, (void *)topics[pMsg->u8IndexMsg]);
 }
@@ -383,7 +386,7 @@ static void CalcValues(uint16_t* pSensorsVal)
 
 	u8Aux = rand() % 10;
 
-	if((u8Vel > 180)&&(u8Vel <= 200))
+	if((u8Vel > 100)&&(u8Vel <= 200))
 	{
 		u8Accelerator = (u8Aux >= 8 ? 1U : 0U);
 	}
@@ -497,10 +500,7 @@ static void publish_msgs(void *arg)
 	uint16_t u16MsgsValues[TotalMsgs];
 	stMsgStruct Msgs[TotalMsgs];
 
-	static uint8_t u8Vel;
-	uint8_t msg[2];
 	err_t err;
-	int i;
     uint32_t currSeconds;
 
     LWIP_UNUSED_ARG(arg);
@@ -518,7 +518,7 @@ static void publish_msgs(void *arg)
 
     for(;;)
     {
-    	if((Flag == true))
+    	if(Flag == true)
     	{
     		CalcValues((uint16_t*)u16MsgsValues);
 
@@ -538,7 +538,9 @@ static void publish_msgs(void *arg)
 					{
 						PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
 					}
-//					sys_msleep(500U);
+#ifdef TEST_APP
+					sys_msleep(500U);
+#endif
     			}
     		}
 
