@@ -31,14 +31,19 @@
  * Definitions
  ******************************************************************************/
 #ifndef AP_SSID
-#define AP_SSID "my_network"
+#define AP_SSID "Totalplay-A3AA"
 #endif
 
 #ifndef AP_PASSWORD
-#define AP_PASSWORD "my_password"
+#define AP_PASSWORD "A3AA04ECvsJn64JH"
 #endif
 
 #define WIFI_NETWORK_LABEL "my_wifi"
+
+#define APP_BOARD_TEST_LED_PORT BOARD_LED_BLUE_GPIO_PORT
+#define APP_BOARD_TEST_LED_PIN  BOARD_LED_BLUE_GPIO_PIN
+#define APP_BOARD_TEST_LED_GREEN_PIN  12U
+#define APP_BOARD_TEST_LED_RED_PIN  1U
 
 /*******************************************************************************
  * Variables
@@ -138,8 +143,23 @@ static void main_task(void *arg)
  */
 int main(void)
 {
+	 /* Define the init structure for the output LED pin*/
+	gpio_pin_config_t led_config = {
+		kGPIO_DigitalOutput,
+		0,
+	};
+
     /* Initialize the hardware */
     BOARD_InitHardware();
+
+    GPIO_PortInit(GPIO, APP_BOARD_TEST_LED_PORT);
+    GPIO_PinInit(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_PIN, &led_config);
+    GPIO_PinInit(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_GREEN_PIN, &led_config);
+    GPIO_PinInit(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_RED_PIN, &led_config);
+    GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_PIN, 1);
+    GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_GREEN_PIN, 1);
+    GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_RED_PIN, 1);
+
 
     /* Create the main Task */
     if (xTaskCreate(main_task, "main_task", 1024, NULL, configMAX_PRIORITIES - 4, NULL) != pdPASS)

@@ -14,6 +14,9 @@
 
 #include "board.h"
 #include "fsl_silicon_id.h"
+#include "fsl_rtc.h"
+#include "stdlib.h"
+#include "time.h"
 
 #include "lwip/opt.h"
 #include "lwip/api.h"
@@ -28,7 +31,7 @@
 
 /*! @brief MQTT server host name or IP address. */
 #ifndef EXAMPLE_MQTT_SERVER_HOST
-#define EXAMPLE_MQTT_SERVER_HOST "broker.hivemq.com"
+#define EXAMPLE_MQTT_SERVER_HOST /*"test.mosquitto.org"*/ "broker.hivemq.com"
 #endif
 
 /*! @brief MQTT server port number. */
@@ -48,6 +51,43 @@
 /*! @brief Priority of the temporary initialization thread. */
 #define APP_THREAD_PRIO DEFAULT_THREAD_PRIO
 
+/*! @brief Stack size of the temporary initialization thread. */
+#define PUBLISH_THREAD_STACKSIZE 1024
+
+/*! @brief Priority of the temporary initialization thread. */
+#define PUBLISH_THREAD_PRIO DEFAULT_THREAD_PRIO
+
+#define SAMPLE_FREQ	  1
+
+#define APP_BOARD_TEST_LED_PORT BOARD_LED_BLUE_GPIO_PORT
+#define APP_BOARD_TEST_LED_PIN  BOARD_LED_BLUE_GPIO_PIN
+#define APP_BOARD_TEST_LED_GREEN_PIN  12U
+#define APP_BOARD_TEST_LED_RED_PIN  1U
+
+
+typedef enum {
+	Brake = 0,
+	Accelerator,
+	RPM,
+	Veloc,
+	Temp,
+	TotalMsgs
+}enPublishSMsgs;
+
+typedef enum {
+	Air = 0,
+	Direction,
+	Lights,
+	Windows,
+	TotalRxMsgs
+}enReceiveSMsgs;
+
+
+typedef struct {
+	uint8_t u8IndexMsg;
+	uint8_t MsgPayLoad[5];
+}stMsgStruct;
+
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -60,6 +100,11 @@ static void connect_to_mqtt(void *ctx);
 
 /*! @brief MQTT client data. */
 static mqtt_client_t *mqtt_client;
+
+static sys_thread_t xHandleP;
+static volatile bool Flag = false;
+static uint8_t TopicIndex;
+static uint8_t RxMsgs[TotalRxMsgs][35];
 
 /*! @brief MQTT client ID string. */
 static char client_id[(SILICONID_MAX_LENGTH * 2) + 5];
@@ -90,6 +135,23 @@ static volatile bool connected = false;
  ******************************************************************************/
 
 /*!
+ * @brief ISR for Alarm interrupt
+ *
+ * This function changes the state of busyWait.
+ */
+void RTC_IRQHandler(void)
+{
+    if (RTC_GetStatusFlags(RTC) & kRTC_AlarmFlag)
+    {
+    	Flag = true;
+
+        /* Clear alarm flag */
+        RTC_ClearStatusFlags(RTC, kRTC_AlarmFlag);
+    }
+    SDK_ISR_EXIT_BARRIER;
+}
+
+/*!
  * @brief Called when subscription request finishes.
  */
 static void mqtt_topic_subscribed_cb(void *arg, err_t err)
@@ -106,6 +168,30 @@ static void mqtt_topic_subscribed_cb(void *arg, err_t err)
     }
 }
 
+static uint8_t GetTopicIndex(const char *topic)
+{
+	uint8_t Index = (uint8_t)TotalRxMsgs;
+
+	if(strcmp(topic, "HM_TeleCar/CAN/FIGO/Air") == 0)
+	{
+		Index = (uint8_t)Air;
+	}
+	else if(strcmp(topic, "HM_TeleCar/CAN/FIGO/Direccion") == 0)
+	{
+		Index = (uint8_t)Direction;
+	}
+	else if(strcmp(topic, "HM_TeleCar/CAN/FIGO/Luces") == 0)
+	{
+		Index = (uint8_t)Lights;
+	}
+	else if(strcmp(topic, "HM_TeleCar/CAN/FIGO/Ventanas") == 0)
+	{
+		Index = (uint8_t)Windows;
+	}
+
+	return Index;
+}
+
 /*!
  * @brief Called when there is a message on a subscribed topic.
  */
@@ -114,6 +200,8 @@ static void mqtt_incoming_publish_cb(void *arg, const char *topic, u32_t tot_len
     LWIP_UNUSED_ARG(arg);
 
     PRINTF("Received %u bytes from the topic \"%s\": \"", tot_len, topic);
+
+    TopicIndex = GetTopicIndex(topic);
 }
 
 /*!
@@ -141,6 +229,19 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
     {
         PRINTF("\"\r\n");
     }
+
+    if(TopicIndex < TotalRxMsgs)
+    {
+        for(i = 0; i < 35; i++)
+        {
+        	RxMsgs[TopicIndex][i] = 0;
+        }
+
+    	for(i = 0; i < len; i++)
+        {
+        	RxMsgs[TopicIndex][i] = data[i];
+        }
+    }
 }
 
 /*!
@@ -148,8 +249,8 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
  */
 static void mqtt_subscribe_topics(mqtt_client_t *client)
 {
-    static const char *topics[] = {"lwip_topic/#", "lwip_other/#"};
-    int qos[]                   = {0, 1};
+    static const char *topics[] = {"HM_TeleCar/CAN/FIGO/Air", "HM_TeleCar/CAN/FIGO/Direccion", "HM_TeleCar/CAN/FIGO/Luces", "HM_TeleCar/CAN/FIGO/Ventanas"};
+    int qos[]                   = {0, 0, 0, 0};
     err_t err;
     int i;
 
@@ -239,7 +340,9 @@ static void mqtt_message_published_cb(void *arg, err_t err)
 
     if (err == ERR_OK)
     {
+#ifdef TEST_APP
         PRINTF("Published to the topic \"%s\".\r\n", topic);
+#endif
     }
     else
     {
@@ -252,14 +355,209 @@ static void mqtt_message_published_cb(void *arg, err_t err)
  */
 static void publish_message(void *ctx)
 {
-    static const char *topic   = "lwip_topic/100";
-    static const char *message = "message from board";
+	static const char *topics[] = {"HM_TeleCar/CAN/FIGO/Frenos", "HM_TeleCar/CAN/FIGO/Acelerador", "HM_TeleCar/CAN/FIGO/Rpm", "HM_TeleCar/CAN/FIGO/Velocidad", "HM_TeleCar/CAN/FIGO/Temperatura"};
 
-    LWIP_UNUSED_ARG(ctx);
+	stMsgStruct* pMsg;
+    uint8_t msg[5];
 
-    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    pMsg = (stMsgStruct*)ctx;
 
-    mqtt_publish(mqtt_client, topic, message, strlen(message), 1, 0, mqtt_message_published_cb, (void *)topic);
+    for(uint8_t u8i = 0; u8i < 5; u8i++)
+    {
+    	msg[u8i] = pMsg->MsgPayLoad[u8i];
+    }
+
+	int i;
+#ifdef TEST_APP
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topics[pMsg->u8IndexMsg]);
+#endif
+
+    mqtt_publish(mqtt_client, topics[pMsg->u8IndexMsg], msg, strlen(msg), 1, 0, mqtt_message_published_cb, (void *)topics[pMsg->u8IndexMsg]);
+}
+
+static void CalcValues(uint16_t* pSensorsVal)
+{
+	uint8_t u8Accelerator = 0U;
+	uint8_t u8Aux = 0U;
+	uint8_t u8Brake = 0U;
+	uint16_t u16RPM = 0U;
+	static uint8_t u8Vel = 0U;
+	static uint8_t u8Temp = 0U;
+
+	u8Aux = rand() % 10;
+
+	if((u8Vel > 100)&&(u8Vel <= 200))
+	{
+		u8Accelerator = (u8Aux >= 8 ? 1U : 0U);
+	}
+	else
+	{
+		u8Accelerator = (u8Aux >= 7 ? 0U : 1U);
+	}
+
+	if(u8Accelerator)
+	{
+		if(u8Vel < 200)
+		{
+			u8Vel = u8Vel + ((rand() % 9) + 1);
+
+			u8Vel = (u8Vel >= 200 ? 200 : u8Vel);
+		}
+
+		if(u8Temp < 50)
+		{
+			u8Temp = u8Temp + ((rand() % 3) + 1);
+
+			u8Temp = (u8Temp >= 50 ? 50 : u8Temp);
+		}
+	}
+	else
+	{
+		if(u8Vel > 0)
+		{
+			u8Vel = u8Vel - ((rand() % 9) + 1);
+
+			u8Vel = (u8Vel > 200 ? 0 : u8Vel);
+		}
+
+		if(u8Temp > 0)
+		{
+			u8Temp = u8Temp - ((rand() % 3) + 1);
+
+			u8Temp = (u8Temp > 50 ? 0 : u8Temp);
+		}
+	}
+
+	u16RPM = ((uint16_t)u8Vel * 30);
+	u8Brake = !(u8Accelerator);
+
+	pSensorsVal[Accelerator] = (uint16_t)u8Accelerator;
+	pSensorsVal[Brake] = (uint16_t)u8Brake;
+	pSensorsVal[RPM] = u16RPM;
+	pSensorsVal[Veloc] = (uint16_t)u8Vel;
+	pSensorsVal[Temp] = (uint16_t)u8Temp;
+}
+
+static void ConvertToString(uint16_t u16DecimalValue, uint8_t* StringMsg)
+{
+	uint16_t u16Aux = 0U;
+	uint8_t u8Counter = 0U;
+	uint8_t u8Index = 0U;
+	uint8_t u8Dig = 0U;
+
+	u16Aux = u16DecimalValue;
+
+	if(u16Aux == 0)
+	{
+		u8Counter = 1;
+	}
+	else
+	{
+		while(u16Aux > 0)
+		{
+			u16Aux = u16Aux/10;
+			u8Counter++;
+		}
+	}
+
+	StringMsg[u8Counter] = '\0';
+	u16Aux = u16DecimalValue;
+	u8Index = u8Counter - 1;
+
+	while((u8Index >= 0)&&(u8Index < u8Counter))
+	{
+		u8Dig = (uint8_t)u16Aux%10;
+		u16Aux = u16Aux/10;
+		StringMsg[u8Index] = u8Dig + '0';
+		u8Index--;
+	}
+}
+
+static void SetControl(void)
+{
+	if(strcmp(RxMsgs[Lights], "Encender luces altas") == 0)
+	{
+		GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_PIN, 0U);
+		GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_GREEN_PIN, 1U);
+		GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_RED_PIN, 1U);
+	}
+	else if(strcmp(RxMsgs[Lights], "Encender luces bajas") == 0)
+	{
+		GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_PIN, 1U);
+		GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_GREEN_PIN, 0U);
+		GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_RED_PIN, 0U);
+	}
+	else if(strcmp(RxMsgs[Lights], "Apagar luces") == 0)
+	{
+		GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_PIN, 1U);
+		GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_GREEN_PIN, 1U);
+		GPIO_PinWrite(GPIO, APP_BOARD_TEST_LED_PORT, APP_BOARD_TEST_LED_RED_PIN, 1U);
+	}
+}
+
+static void publish_msgs(void *arg)
+{
+	uint16_t u16MsgsValues[TotalMsgs];
+	stMsgStruct Msgs[TotalMsgs];
+
+	err_t err;
+    uint32_t currSeconds;
+
+    LWIP_UNUSED_ARG(arg);
+
+    srand(time(0));
+
+	/* Read the RTC seconds register to get current time in seconds */
+	currSeconds = RTC_GetSecondsTimerCount(RTC);
+
+	/* Add alarm seconds to current time */
+	currSeconds += SAMPLE_FREQ;
+
+	/* Set alarm time in seconds */
+	RTC_SetSecondsTimerMatch(RTC, currSeconds);
+
+    for(;;)
+    {
+    	if(Flag == true)
+    	{
+    		CalcValues((uint16_t*)u16MsgsValues);
+
+    		for(uint8_t u8i = 0U; u8i < TotalMsgs; u8i++)
+    		{
+    			ConvertToString(u16MsgsValues[u8i], (uint8_t*)&Msgs[u8i].MsgPayLoad);
+    			Msgs[u8i].u8IndexMsg = u8i;
+    		}
+
+    		if (connected)
+    		{
+    			for(uint8_t u8Index = 0U; u8Index < TotalMsgs; u8Index++)
+    			{
+    				err = tcpip_callback(publish_message, (void*)&Msgs[u8Index]);
+
+					if (err != ERR_OK)
+					{
+						PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+					}
+#ifdef TEST_APP
+					sys_msleep(500U);
+#endif
+    			}
+    		}
+
+    		/* Read the RTC seconds register to get current time in seconds */
+    		currSeconds = RTC_GetSecondsTimerCount(RTC);
+
+    		/* Add alarm seconds to current time */
+    		currSeconds += SAMPLE_FREQ;
+
+    		/* Set alarm time in seconds */
+    		RTC_SetSecondsTimerMatch(RTC, currSeconds);
+
+    		Flag = false;
+    	}
+
+    	SetControl();
+    }
 }
 
 /*!
@@ -270,6 +568,7 @@ static void app_thread(void *arg)
     struct netif *netif = (struct netif *)arg;
     err_t err;
     int i;
+    rtc_datetime_t date;
 
     PRINTF("\r\nIPv4 Address     : %s\r\n", ipaddr_ntoa(&netif->ip_addr));
     PRINTF("IPv4 Subnet mask : %s\r\n", ipaddr_ntoa(&netif->netmask));
@@ -306,21 +605,40 @@ static void app_thread(void *arg)
         PRINTF("Failed to obtain IP address: %d.\r\n", err);
     }
 
-    /* Publish some messages */
-    for (i = 0; i < 5;)
-    {
-        if (connected)
-        {
-            err = tcpip_callback(publish_message, NULL);
-            if (err != ERR_OK)
-            {
-                PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-            }
-            i++;
-        }
+	/* Publish some messages */
+	for (i = 0; i < 5;)
+	{
+		if (connected)
+		{
+			i++;
+		}
 
-        sys_msleep(1000U);
-    }
+		sys_msleep(1000U);
+	}
+
+	/* Init RTC */
+	RTC_Init(RTC);
+
+	/* Set a start date time and start RT */
+	date.year   = 2025U;
+	date.month  = 3U;
+	date.day    = 10U;
+	date.hour   = 19U;
+	date.minute = 0;
+	date.second = 0;
+
+	RTC_EnableTimer(RTC, false);
+
+	RTC_SetDatetime(RTC, &date);
+
+	EnableIRQ(RTC_IRQn);
+
+	RTC_EnableTimer(RTC, true);
+
+	if (sys_thread_new("publish_msgs", publish_msgs, NULL, PUBLISH_THREAD_STACKSIZE, PUBLISH_THREAD_PRIO) == NULL)
+	{
+		LWIP_ASSERT("main(): Task creation failed.", 0);
+	}
 
     vTaskDelete(NULL);
 }

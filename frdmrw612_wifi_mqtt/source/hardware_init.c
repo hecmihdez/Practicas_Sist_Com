@@ -15,6 +15,7 @@
 /*${function:start}*/
 void BOARD_InitHardware(void)
 {
+	BOARD_InitPins();
     BOARD_InitBootPins();
     if (BOARD_IS_XIP())
     {

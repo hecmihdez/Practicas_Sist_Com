@@ -6,6 +6,7 @@
  */
 
 #include "fsl_common.h"
+#include "fsl_gpio.h"
 #include "pin_mux.h"
 #include "fsl_io_mux.h"
 
@@ -27,8 +28,24 @@ void BOARD_InitBootPins(void)
  *
  * END ****************************************************************************************************************/
 void BOARD_InitPins(void) {                                /*!< Function assigned for the core: Cortex-M33[cm33] */
+/* Enables the clock for the GPIO0 module */
+	GPIO_PortInit(GPIO, 0);
+
+	gpio_pin_config_t gpio0_pinD12_config = {
+		.pinDirection = kGPIO_DigitalOutput,
+		.outputLogic = 0U
+	};
+	/* Initialize GPIO functionality on pin PIO0_0 (pin D12)  */
+	GPIO_PinInit(GPIO, 0U, 0U, &gpio0_pinD12_config);
+	GPIO_PinInit(GPIO, 0U, 12U, &gpio0_pinD12_config);
+	GPIO_PinInit(GPIO, 0U, 1U, &gpio0_pinD12_config);
+
     IO_MUX_SetPinMux(IO_MUX_FC3_USART_DATA);
     IO_MUX_SetPinMux(IO_MUX_GPIO11);
+
+    IO_MUX_SetPinMux(IO_MUX_GPIO0);
+    IO_MUX_SetPinMux(IO_MUX_GPIO1);
+    IO_MUX_SetPinMux(IO_MUX_GPIO12);
 }
 
 /***********************************************************************************************************************
