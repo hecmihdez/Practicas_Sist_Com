@@ -37,6 +37,11 @@
  */
 #define NO_SYS 0
 
+/* Enable IGMP and MDNS */
+#define LWIP_IGMP                  1
+#define LWIP_MDNS_RESPONDER        1
+#define LWIP_NUM_NETIF_CLIENT_DATA (LWIP_MDNS_RESPONDER)
+
 #define MAX_SOCKETS_TCP           8
 #define MAX_LISTENING_SOCKETS_TCP 4
 #define MAX_SOCKETS_UDP           6
@@ -425,6 +430,8 @@ void sys_mark_tcpip_thread(void);
 /**
  * DNS related options, revisit later to fine tune.
  */
+#define LWIP_MDNS_RESPONDER 1
+
 #define LWIP_DNS            1
 #define DNS_TABLE_SIZE      2  // number of table entries, default 4
 #define DNS_MAX_NAME_LENGTH 64 // max. name length, default 256

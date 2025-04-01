@@ -15,8 +15,10 @@
 #include "app.h"
 #include "wpl.h"
 #include "timers.h"
+#include "httpsrv.h"
 
 #include "fsl_debug_console.h"
+#include "httpsrv_freertos.h"
 #include "mqtt_freertos.h"
 
 #include <stdio.h>
@@ -132,6 +134,10 @@ static void main_task(void *arg)
 
     ConnectTo();
     /// wait_dns
+
+    http_server_enable_mdns(netif_default, "wifi-mqtt");
+
+    http_server_print_ip_cfg(netif_default);
 
     mqtt_freertos_run_thread(netif_default);
 
