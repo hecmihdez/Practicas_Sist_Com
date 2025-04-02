@@ -16,6 +16,7 @@
  *
  * @param netif  netif which example should use
  */
-void mqtt_freertos_run_thread(struct netif *netif);
+//void mqtt_freertos_run_thread(struct netif *netif);
+void mqtt_freertos_run_thread(bool connectionState);
 
 #endif /* MQTT_FREERTOS_H */

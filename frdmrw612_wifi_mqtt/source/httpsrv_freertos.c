@@ -87,7 +87,7 @@ static const HTTPSRV_AUTH_REALM_STRUCT auth_realms[] = {
 
 char cgi_data[CGI_DATA_LENGTH_MAX + 1];
 
-const HTTPSRV_CGI_LINK_STRUCT cgi_lnk_tbl[] = {
+const HTTPSRV_CGI_LINK_STRUCT cgi_lnk_tbl2[] = {
     {"rtcdata", cgi_rtc_data},
     {"get", cgi_example},
     {"post", cgi_example},
@@ -434,6 +434,7 @@ void http_server_enable_mdns(struct netif *netif, const char *mdns_hostname)
     mdns_resp_init();
     mdns_resp_add_netif(netif, mdns_hostname);
     mdns_resp_add_service(netif, mdns_hostname, "_mqtt", DNSSD_PROTO_TCP, 1883, http_srv_txt, NULL);
+    mdns_resp_add_service(netif, "wifi-http", "_http", DNSSD_PROTO_TCP, 80, http_srv_txt, NULL);
     UNLOCK_TCPIP_CORE();
 
     (void)strncpy(s_mdns_hostname, mdns_hostname, sizeof(s_mdns_hostname) - 1);
@@ -456,7 +457,7 @@ void http_server_socket_init(void)
     params.root_dir    = "";
     params.index_page  = "/index.html";
     params.auth_table  = auth_realms;
-    params.cgi_lnk_tbl = cgi_lnk_tbl;
+    params.cgi_lnk_tbl = cgi_lnk_tbl2;
     params.ssi_lnk_tbl = ssi_lnk_tbl;
 #if HTTPSRV_CFG_WEBSOCKET_ENABLED
     params.ws_tbl = ws_tbl;

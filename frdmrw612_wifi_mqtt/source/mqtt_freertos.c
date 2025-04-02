@@ -565,82 +565,92 @@ static void publish_msgs(void *arg)
  */
 static void app_thread(void *arg)
 {
-    struct netif *netif = (struct netif *)arg;
+//    struct netif *netif = (struct netif *)arg;
+    bool *pconnectionState = (bool*)arg;
+    bool connectionState = (bool)*pconnectionState;
+    const TickType_t xDelay = 10 / portTICK_PERIOD_MS;
     err_t err;
     int i;
     rtc_datetime_t date;
 
-    PRINTF("\r\nIPv4 Address     : %s\r\n", ipaddr_ntoa(&netif->ip_addr));
-    PRINTF("IPv4 Subnet mask : %s\r\n", ipaddr_ntoa(&netif->netmask));
-    PRINTF("IPv4 Gateway     : %s\r\n\r\n", ipaddr_ntoa(&netif->gw));
+    if(connectionState)
+    {
+//		PRINTF("\r\nIPv4 Address     : %s\r\n", ipaddr_ntoa(&netif->ip_addr));
+//		PRINTF("IPv4 Subnet mask : %s\r\n", ipaddr_ntoa(&netif->netmask));
+//		PRINTF("IPv4 Gateway     : %s\r\n\r\n", ipaddr_ntoa(&netif->gw));
 
-    /*
-     * Check if we have an IP address or host name string configured.
-     * Could just call netconn_gethostbyname() on both IP address or host name,
-     * but we want to print some info if goint to resolve it.
-     */
-    if (ipaddr_aton(EXAMPLE_MQTT_SERVER_HOST, &mqtt_addr) && IP_IS_V4(&mqtt_addr))
-    {
-        /* Already an IP address */
-        err = ERR_OK;
-    }
-    else
-    {
-        /* Resolve MQTT broker's host name to an IP address */
-        PRINTF("Resolving \"%s\"...\r\n", EXAMPLE_MQTT_SERVER_HOST);
-        err = netconn_gethostbyname(EXAMPLE_MQTT_SERVER_HOST, &mqtt_addr);
-    }
-
-    if (err == ERR_OK)
-    {
-        /* Start connecting to MQTT broker from tcpip_thread */
-        err = tcpip_callback(connect_to_mqtt, NULL);
-        if (err != ERR_OK)
-        {
-            PRINTF("Failed to invoke broker connection on the tcpip_thread: %d.\r\n", err);
-        }
-    }
-    else
-    {
-        PRINTF("Failed to obtain IP address: %d.\r\n", err);
-    }
-
-	/* Publish some messages */
-	for (i = 0; i < 5;)
-	{
-		if (connected)
+		/*
+		 * Check if we have an IP address or host name string configured.
+		 * Could just call netconn_gethostbyname() on both IP address or host name,
+		 * but we want to print some info if goint to resolve it.
+		 */
+		if (ipaddr_aton(EXAMPLE_MQTT_SERVER_HOST, &mqtt_addr) && IP_IS_V4(&mqtt_addr))
 		{
-			i++;
+			/* Already an IP address */
+			err = ERR_OK;
+		}
+		else
+		{
+			/* Resolve MQTT broker's host name to an IP address */
+			PRINTF("Resolving \"%s\"...\r\n", EXAMPLE_MQTT_SERVER_HOST);
+			err = netconn_gethostbyname(EXAMPLE_MQTT_SERVER_HOST, &mqtt_addr);
 		}
 
-		sys_msleep(1000U);
-	}
+		if (err == ERR_OK)
+		{
+			/* Start connecting to MQTT broker from tcpip_thread */
+			err = tcpip_callback(connect_to_mqtt, NULL);
+			if (err != ERR_OK)
+			{
+				PRINTF("Failed to invoke broker connection on the tcpip_thread: %d.\r\n", err);
+			}
+		}
+		else
+		{
+			PRINTF("Failed to obtain IP address: %d.\r\n", err);
+		}
 
-	/* Init RTC */
-	RTC_Init(RTC);
+		/* Publish some messages */
+		for (i = 0; i < 5;)
+		{
+			if (connected)
+			{
+				i++;
+			}
 
-	/* Set a start date time and start RT */
-	date.year   = 2025U;
-	date.month  = 3U;
-	date.day    = 10U;
-	date.hour   = 19U;
-	date.minute = 0;
-	date.second = 0;
+			sys_msleep(1000U);
+		}
 
-	RTC_EnableTimer(RTC, false);
+		/* Init RTC */
+		RTC_Init(RTC);
 
-	RTC_SetDatetime(RTC, &date);
+		/* Set a start date time and start RT */
+		date.year   = 2025U;
+		date.month  = 3U;
+		date.day    = 10U;
+		date.hour   = 19U;
+		date.minute = 0;
+		date.second = 0;
 
-	EnableIRQ(RTC_IRQn);
+		RTC_EnableTimer(RTC, false);
 
-	RTC_EnableTimer(RTC, true);
+		RTC_SetDatetime(RTC, &date);
 
-	if (sys_thread_new("publish_msgs", publish_msgs, NULL, PUBLISH_THREAD_STACKSIZE, PUBLISH_THREAD_PRIO) == NULL)
-	{
-		LWIP_ASSERT("main(): Task creation failed.", 0);
-	}
+		EnableIRQ(RTC_IRQn);
 
-    vTaskDelete(NULL);
+		RTC_EnableTimer(RTC, true);
+
+		if (sys_thread_new("publish_msgs", publish_msgs, NULL, PUBLISH_THREAD_STACKSIZE, PUBLISH_THREAD_PRIO) == NULL)
+		{
+			LWIP_ASSERT("main(): Task creation failed.", 0);
+		}
+
+		vTaskDelete(NULL);
+    }
+    else
+    {
+    	vTaskDelay( xDelay );
+    }
 }
 
 static void generate_client_id(void)
@@ -703,7 +713,8 @@ static void generate_client_id(void)
  *
  * @param netif  netif which example should use
  */
-void mqtt_freertos_run_thread(struct netif *netif)
+//void mqtt_freertos_run_thread(struct netif *netif)
+void mqtt_freertos_run_thread(bool connectionState)
 {
     LOCK_TCPIP_CORE();
     mqtt_client = mqtt_client_new();
@@ -718,7 +729,7 @@ void mqtt_freertos_run_thread(struct netif *netif)
 
     generate_client_id();
 
-    if (sys_thread_new("app_task", app_thread, netif, APP_THREAD_STACKSIZE, APP_THREAD_PRIO) == NULL)
+    if (sys_thread_new("app_task", app_thread, (void*)&connectionState, APP_THREAD_STACKSIZE, APP_THREAD_PRIO) == NULL)
     {
         LWIP_ASSERT("mqtt_freertos_start_thread(): Task creation failed.", 0);
     }
