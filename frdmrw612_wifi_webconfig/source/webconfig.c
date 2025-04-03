@@ -494,7 +494,7 @@ static uint32_t SetBoardToAP()
         while (1)
             __BKPT(0);
     }
-    g_BoardState.connected = true;
+//    g_BoardState.connected = true;
 
     char ip[16];
     WPL_GetIP(ip, 0);

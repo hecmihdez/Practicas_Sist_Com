@@ -566,9 +566,7 @@ static void publish_msgs(void *arg)
  */
 static void app_thread(void *arg)
 {
-//    struct netif *netif = (struct netif *)arg;
     bool *pconnectionState = (bool*)arg;
-//    bool connectionState = (bool)*pconnectionState;
     const TickType_t xDelay = 10 / portTICK_PERIOD_MS;
     err_t err;
     int i;
@@ -584,10 +582,6 @@ static void app_thread(void *arg)
     			http_server_enable_mdns(netif_default, "wifi-mqtt-FIGO");
 
     			http_server_print_ip_cfg(netif_default);
-
-//    			PRINTF("\r\nIPv4 Address     : %s\r\n", ipaddr_ntoa(&netif->ip_addr));
-//    			PRINTF("IPv4 Subnet mask : %s\r\n", ipaddr_ntoa(&netif->netmask));
-//    			PRINTF("IPv4 Gateway     : %s\r\n\r\n", ipaddr_ntoa(&netif->gw));
 
     			/*
     			 * Check if we have an IP address or host name string configured.
@@ -725,7 +719,6 @@ static void generate_client_id(void)
  *
  * @param netif  netif which example should use
  */
-//void mqtt_freertos_run_thread(struct netif *netif)
 void mqtt_freertos_run_thread(bool* pconnectionState)
 {
     LOCK_TCPIP_CORE();
