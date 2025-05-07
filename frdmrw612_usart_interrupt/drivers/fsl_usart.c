@@ -233,7 +233,7 @@ status_t USART_Init(USART_Type *base, const usart_config_t *config, uint32_t src
     USART_SetRxTimeoutConfig(base, &(config->rxTimeout));
 #endif
     /* setup configuration and enable USART */
-    base->CFG = USART_CFG_PARITYSEL(config->parityMode) | USART_CFG_STOPLEN(config->stopBitCount) |
+    base->CFG = USART_CFG_PARITYSEL(config->parityMode) | USART_CFG_STOPLEN(config->stopBitCount) | USART_CFG_LINMODE(config->enableLinMode) |
                 USART_CFG_DATALEN(config->bitCountPerChar) | USART_CFG_LOOP(config->loopback) |
                 USART_CFG_SYNCEN((uint32_t)config->syncMode >> 1) | USART_CFG_SYNCMST((uint8_t)config->syncMode) |
                 USART_CFG_CLKPOL(config->clockPolarity) | USART_CFG_MODE32K(config->enableMode32k) |

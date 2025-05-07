@@ -166,6 +166,9 @@ void BOARD_BootClockRUN(void)
     CLOCK_SetClkDiv(kCLOCK_DivPmuFclk, 5U);         /* Set .PMUFCLKDIV divider to value 5 */
     /* Select the main clock source for the main system clock (MAINCLKSELA and MAINCLKSELB). */
     CLOCK_AttachClk(kMAIN_PLL_to_MAIN_CLK);
+
+    CLOCK_AttachClk(kFFRO_to_FLEXCOMM0);
+
     BOARD_ClockPostConfig();
     /*!< Set SystemCoreClock variable. */
     SystemCoreClock = BOARD_BOOTCLOCKRUN_HCLK;

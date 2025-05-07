@@ -225,6 +225,7 @@ typedef struct _usart_config
     usart_clock_polarity_t clockPolarity; /*!< Selects the clock polarity and sampling edge in synchronous mode. */
 #if defined(FSL_FEATURE_USART_HAS_FIFORXTIMEOUTCFG) && FSL_FEATURE_USART_HAS_FIFORXTIMEOUTCFG
     usart_rx_timeout_config rxTimeout; /*!< rx timeout configuration */
+    bool enableLinMode;
 #endif
 } usart_config_t;
 

@@ -60,6 +60,8 @@ void BOARD_InitPins(void)
 {
     /* Initialize FC3_USART_DATA functionality on pin GPIO_24 (pin F3) */
     IO_MUX_SetPinMux(IO_MUX_FC3_USART_DATA);
+
+    IO_MUX_SetPinMux(IO_MUX_FC0_USART_DATA);
 }
 /***********************************************************************************************************************
  * EOF
