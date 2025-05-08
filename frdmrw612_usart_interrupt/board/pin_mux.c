@@ -26,6 +26,7 @@ processor_version: 0.15.5
 #include "fsl_common.h"
 #include "fsl_io_mux.h"
 #include "pin_mux.h"
+#include "fsl_gpio.h"
 
 /* FUNCTION ************************************************************************************************************
  *
@@ -58,10 +59,27 @@ BOARD_InitPins:
 /* Function assigned for the Cortex-M33 */
 void BOARD_InitPins(void)
 {
+    /* Define the init structure for the input switch pin */
+    gpio_pin_config_t sw_config    = {kGPIO_DigitalInput, 0};
+    gpio_interrupt_config_t config = {kGPIO_PinIntEnableEdge, kGPIO_PinIntEnableLowOrFall};
+
+    GPIO_PortInit(GPIO, 0);
+
     /* Initialize FC3_USART_DATA functionality on pin GPIO_24 (pin F3) */
     IO_MUX_SetPinMux(IO_MUX_FC3_USART_DATA);
 
     IO_MUX_SetPinMux(IO_MUX_FC0_USART_DATA);
+
+    IO_MUX_SetPinMux(IO_MUX_GPIO20);
+
+    /* Init input switch GPIO. */
+    EnableIRQ(GPIO_INTA_IRQn);
+
+    GPIO_PinInit(GPIO, 0, 20, &sw_config);
+
+    /* Enable GPIO pin interrupt */
+    GPIO_SetPinInterruptConfig(GPIO, 0, 20, &config);
+    GPIO_PinEnableInterrupt(GPIO, 0, 20, 0);
 }
 /***********************************************************************************************************************
  * EOF
