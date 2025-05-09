@@ -6,12 +6,22 @@
  */
 
 #include "fsl_usart.h"
+#include "LIN_cfg.h"
 #include "LIN.h"
 
-
+/*******************************************************************************
+ * Definitions
+ ******************************************************************************/
 #define HEADER_BYTES 	(2)
 #define PARITY_MASK		(0xFC)
 
+/*******************************************************************************
+ * Prototypes
+ ******************************************************************************/
+
+/*******************************************************************************
+ * Variables
+ ******************************************************************************/
 
 static lin_msg_callback message_callback = NULL;
 
@@ -40,10 +50,15 @@ const usart_config_t FLEXCOMM0_config = {
   .enableLinMode = true
 };
 
+/*******************************************************************************
+ * Code
+ ******************************************************************************/
+
 void USART_IRQHandler(void)
 {
     static bool FlagBreak = false;
     static uint8_t byte = 0U;
+    USART_Type *base = USART_BASE;
 	uint8_t data;
     uint8_t buffer[10];
 
@@ -54,7 +69,7 @@ void USART_IRQHandler(void)
     }
     else if((kUSART_RxIdleFlag) & USART_GetStatusFlags(USART_BASE))
 	{
-		buffer[byte] = USART_ReadByte(USART_BASE);
+    	buffer[byte] = USART_ReadByte(USART_BASE);
 		byte++;
 
     	if((FlagBreak)&&(byte == 3))

@@ -12,6 +12,7 @@
 #include "fsl_gpio.h"
 #include "fsl_debug_console.h"
 #include "LIN.h"
+#include "LIN_cfg.h"
 
 /*******************************************************************************
  * Definitions
@@ -26,7 +27,7 @@
  ******************************************************************************/
 
 uint8_t MsgsTx[TOTAL_MSGS_TX] = MSG_IDS_MASTER;
-static stResponseData MsgsRx[TOTAL_MSGS_RX] = MSG_RESPONSE_TABLE;
+static stResponseData MsgsRx[TOTAL_MSGS_RX_RESP] = MSG_RESPONSE_TABLE;
 static bool SendMsg = false;
 static uint8_t Index = 0U;
 static uint32_t counter = 0U;
@@ -66,12 +67,16 @@ void GPIO_INTA_DriverIRQHandler(void)
 
 void SysTick_Handler(void)
 {
-	if(counter < 500000)
+	if(counter < 5000)
 	{
 		counter++;
 	}
 	else
 	{
+		SendMsg = true;
+
+		Index = Index < (TOTAL_MSGS_TX - 1) ? Index+1 : 0U;
+
 		counter = 0;
 	}
 }
@@ -152,7 +157,7 @@ int main(void)
     		Header_flag = false;
     		MsgId = LIN_u8GetMsgId(BufferRxFrame.IDMsg);
 
-    		for(uint8_t u8i = 0; u8i < TOTAL_MSGS_RX; u8i++)
+    		for(uint8_t u8i = 0; u8i < TOTAL_MSGS_RX_RESP; u8i++)
     		{
     			if(MsgId == MsgsRx[u8i].Id)
     			{
